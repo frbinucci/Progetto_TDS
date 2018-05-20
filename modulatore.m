@@ -103,7 +103,7 @@ ylabel('Ampiezza');
 %traslerà lo spettro del segnale modulante (segnale acquisito tramite
 %microfono) attorno alla frequenza del segnale portante, in questo caso,
 %12KHz.
-frequenza_modulazione = 12000;
+frequenza_modulazione = 8000;
 
 %Modulazione del segnale mediante la funzione "ammod()", messa a
 %disposizione da Matlab. 
