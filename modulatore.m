@@ -1,210 +1,125 @@
-%% Sezione di inizializzazione.
-
+%% Area di inizializzazione
 clearvars;
 close all;
 
-%% Debug area
-%Questa sezione serve a stabilire se si vuole acquisire il segnale tramite
-%il microfono, oppure utilizzare un file audio già definito (solo a scopo
-%di test).
-type = input('Acquisire audio? (1)');
+%% Acquisizione del segnale da trasmettere.
 
-%% Questa area serve ad acquisire un audio tramite il microfono.
+%Il segnale in ricezione viene acquisito tramite microfono.
+%Definizione del tempo di registrazione (20 secondi).
+tempo_acquisizione = 5;
+%Definizione della frequenza di campionamento necessaria.
+frequenza_campionamento = 50000;
+%Definizione dell'oggetto necessario alla registrazione dell'audio.
+rec = audiorecorder(frequenza_campionamento,16,1);
 
-%Se è stato digitato "1", vengono eseguite le procedure necessarie ad
-%acquisire un file audio tramite microfono.
-if (type == 1)
-    %Definisco una frequenza di campionamento, necessaria all'acquisizione del
-    %segnale.
-    frequenza_campionamento = 50000;
-    %Definisco un tempo di registrazione del segnale.
-    tempo_acquisizione = 10;
-    %Definizione dell'oggetto che consente di rappresentare il registratore del
-    %sistema, indispensabile per l'acquisizione del segnale mediante il
-    %microfono.
-    rec = audiorecorder(frequenza_campionamento,16,1);
-    
-    %Acquisizione del segnale tramite microfono.
-    record(rec, tempo_acquisizione); 
-    pause(tempo_acquisizione+1); 
-    stop(rec);
-    %Ottengo il segnale modulante.
-    segnale_modulante = getaudiodata(rec);
-    half = ceil(length(segnale_modulante)/2);
-    
-    %In questa nuova versione dello script, il file acquisito tramite il
-    %microfono viene suddiviso in due parti. L'idea fondamentale è quella
-    %di modulare ciascuna parte in ampiezza, su una frequenza differente,
-    %per poi sovrapporre i due segnali in un segnale unico.
-    parte_1 = segnale_modulante(1:half);
-    parte_2 = segnale_modulante(half+1:end);
-else
-    [segnale_modulante, frequenza_campionamento] = audioread('violino.wav');   
-end
+%Acquizione dell'audio tramite il microfono del computer.
+record(rec, tempo_acquisizione); 
+pause(tempo_acquisizione+1); 
+stop(rec);
 
-%% Costruzione del filtro passa-basso.
-%In questa sezione di codice ci si occupa di filtrare il segnale acquisito,
-%in modo da far sì che contenga componenti frequenziali solo nell'ordine
-%dei 2KHz.
+%Ottenimento del segnale informativo, contenente l'informazione che deve
+%essere trasmessa.
+segnale_acquisito = getaudiodata(rec);
 
-%Vengono filtrati i due segnali passa-basso, in modo da far sì che il loro spettri
-%modulati risultino ben separati.
+%% Filtraggio del segnale.
+%Il segnale non viene trasmesso sfruttando le onde radio (come di norma
+%avviene nella modulazione di ampiezza), ma viene trasmesso tramite un
+%altoparlante. Prima di modulare il segnale, esso viene filtrato
+%passabasso, in modo da conservare le componenti fino a 4KHz.
 
 %Definisco i parametri del filtro.
-fpass = 2500; %%Limite banda passante.
-fstop = 2900; %%Limite banda di transisione.
+fpass = 4000; %%Limite banda passante.
+fstop = 4500; %%Limite banda di transisione.
 Apass = 1; %%Ripple in banda passante. (dB).
 Astop = 45; %%Ripple in banda di transizione (dB).
 
+%Funzioni necessarie all'implementazione della risposta impulsiva
+%desiderata.
+%--------------------------------------------------------------------------
 [N, Fo, Mo, W] = firpmord([fpass fstop], ... % estremi della banda di transizione
                             [1 0], ... % ampiezze desiderate nella banda passante e tagliante
                             [(10^(Apass/20) - 1) 10^(-Astop/20)], ... % ripple e attenuazione IN LINEARE
                             frequenza_campionamento); % la frequenza di campionamento
-
-
 N = 2 * ceil(N/2) + 2;
-
 risposta_impulsiva = firpm(N, Fo, Mo, W);
-%% Sezione dedicata al plot della risposta impulsiva del filtro e della relativa Funzione di Trasferimento (Opzionale).
-%funzione_trasferimento = fft(risposta_impulsiva);
-%asse_frequenze = (0:(length(risposta_impulsiva) - 1))' * (frequenza_campionamento / length(risposta_impulsiva));
-
-%figure('Name','Filtro','NumberTitle','off');
-%subplot(2,1,1);
-%plot(0:N,risposta_impulsiva);
-%grid on;
-%xlabel("Tempo");
-%ylabel("Ampiezza");
-%subplot(2,1,2);
-%plot(asse_frequenze-frequenza_campionamento/2,20*log10(abs(funzione_trasferimento)));
-%grid on;
-%xlabel("Frequenza (HZ)");
-%ylabel("Ampiezza");
-
-%% Filtraggio dei due segnali.
-parte_1 = filter(risposta_impulsiva,1, parte_1);
-parte_2 = filter(risposta_impulsiva,1,parte_2);
-
-%sound(parte_1,frequenza_campionamento);
-%pause(6);
-%sound(parte_2,frequenza_campionamento);
-
-%% Analisi Spettrale dei segnali filtrati.
-
-%In questa sezione di codice si procede ad una stima spettrale dei due
-%segnali filtrati, in modo da verificare l'effettiva separazione
-%frequenziale dei due spettri.
-
-%Stima spettrale di ciascuno dei due segnali, mediante l'utilizzo della
-%funzione Matlab "fft()", necessario al calcolo della DFT di un segnale.
-spettro_primo_segnale_modulante = fft(parte_1);
-spettro_secondo_segnale_modulante = fft(parte_2);
-
-%Porto l'asse delle frequenze in Hz.
-f = (0:(length(parte_1) - 1))' * (frequenza_campionamento / length(parte_1));
-
-%Ottengo i grafici degli spettri delle ampiezze dei due segnali (parte_1 e
-%parte_2).
 %--------------------------------------------------------------------------
-%Parte_1
+
+%Filtro il segnale acquisito mediante la risposta impulsiva precedentemente
+%definita.
+segnale_informativo = filter(risposta_impulsiva,1, segnale_acquisito);
+
+%Riporto l'asse delle frequenze dalla frequenza normalizzata alla frequenza
+%in Hz. (Tale operazione mi serve a plottare gli spettri di ampiezza).
+f = (0:(length(segnale_acquisito) - 1))' * (frequenza_campionamento / length(segnale_acquisito));
+
+%Calcolo la DFT dei due segnali acquisiti mediante la funzione "fft()",
+%messa a disposizione da Matlab.
+spettro_segnale_acquisito = fft(segnale_acquisito);
+spettro_segnale_informativo = fft(segnale_informativo);
+
+%Ottenimento degli spettri di ampiezza del segnale acquisito e di quello
+%filtrato.
+%--------------------------------------------------------------------------
 figure('Name','Spettri Segnali Acquisiti','NumberTitle','off');
 subplot(2,1,1);
-plot(f - frequenza_campionamento/2, fftshift(abs(spettro_primo_segnale_modulante)));
-title('Spettro del primo segnale modulante');
+plot(f - frequenza_campionamento/2, fftshift(abs(spettro_segnale_acquisito)));
+title('Spettro di ampiezza del segnale NON Filtrato');
 grid on;
 xlabel('Frequenza (Hz)');
 ylabel('Ampiezza');
-%Parte_2
 subplot(2,1,2);
-plot(f-frequenza_campionamento/2,fftshift(abs(spettro_secondo_segnale_modulante)));
-title('Spettro del secondo segnale modulante');
+plot(f-frequenza_campionamento/2,fftshift(abs(spettro_segnale_informativo)));
+title('Spettro di ampiezza del segnale Filtrato');
 grid on;
 xlabel('Frequenza (Hz)');
 ylabel('Ampiezza');
 %--------------------------------------------------------------------------
 
-%Ottengo i grafici degli spettri delle ampiezze dei due segnali (parte_1 e
-%parte_2).
+%% Modulazione del segnale
+%In questa parte dello script ci si occupa di modulare il segnale in
+%ampiezza, attorno ad una frequenza di 8000Khz. Il valore della frequenza è
+%scelto in maniera tale che il segnale possa essere riprodotto
+%dall'altoparlante di un telefono. 
+%Si è deciso di impiegare la tecnica di modulazione SSB (Single Side Band),
+%una tecnica di modulazione di ampiezza che consente di trasmettere il
+%segnale sopprimendo metà della banda.
+
+frequenza_portante = 8000;
+
+%La modulazione avviene mediante la funzione "SSB", messa a disposizione da
+%Matlab.
+segnale_modulato = ssbmod(segnale_informativo,frequenza_portante,frequenza_campionamento);
+
+%Analisi spettrale del segnale Modulato.
 %--------------------------------------------------------------------------
-%Parte_1
-figure('Name','Andamenti Temporali Segnali Acquisiti','NumberTitle','off');
-subplot(2,1,1);
-plot((0:numel(parte_1)-1)/frequenza_campionamento,parte_1);
-grid on;
-title('Andamento temporale del primo segnale modulante');
-xlabel('Tempo (s)');
-ylabel('Ampiezza');
-%Parte_2
-subplot(2,1,2);
-plot((0:numel(spettro_secondo_segnale_modulante)-1)/frequenza_campionamento,parte_2);
-grid on;
-xlabel('Tempo (s)');
-ylabel('Ampiezza');
-title('Andamento temporale del secondo segnale modulante');
-%--------------------------------------------------------------------------
-%% Modulazione del segnale.
-%Definisco la frequenza del segnale portante. Il processo di modulazione
-%traslerà lo spettro del segnale modulante (segnale acquisito tramite
-%microfono) attorno alla frequenza del segnale portante.
-
-%Per sopperire alle difficoltà nella riproduzione di segnali a frequenza
-%troppo elevata, al momento, si è pensato di modulare i due segnali attorno
-%alle frequenze di 10KHz e 4KHz (funzionalità da migliorare...).
-frequenza_modulazione_parte1 = 10000;
-frequenza_modulazione_parte2 = 4000;
-
-%Modulazione del segnale mediante la funzione "ammod()", messa a
-%disposizione da Matlab. 
-%La funzione richiede in input 3 parametri:
-%1)Il segnale da modulare.
-%2)La frequenza della portante.
-%3)La frequenza di campionamento del segnale modulate.
-primo_segnale_modulato = ammod(parte_1,frequenza_modulazione_parte1,frequenza_campionamento);
-secondo_segnale_modulato = ammod(parte_2,frequenza_modulazione_parte2,frequenza_campionamento);
-
-%Una volta modulati i due segnali, vengono dovrapposti, e viene così
-%generato un terzo segnale chiamato "sovrapposizione_modulata".
-sovrapposizione_modulata = primo_segnale_modulato + secondo_segnale_modulato;
-
-%Ottenimento dello spettro dei tre segnali modulati, mediante l'algoritmo
-%di FFT.
-spettro_primo_segnale_modulato = fft(primo_segnale_modulato);
-spettro_secondo_segnale_modulato = fft(secondo_segnale_modulato);
-spettro_sovrapposizione_modulata = fft(sovrapposizione_modulata);
-
-%Ottenimento dei grafici relativi ai tre spettri delle ampiezze.
-%--------------------------------------------------------------------------
-figure('Name','Spettri Segnali Modulati','NumberTitle','off');
-subplot(2,1,1);
-plot(f - frequenza_campionamento/2, fftshift(abs(spettro_primo_segnale_modulato)));
-title('Spettro del primo segnale modulanto (10KHz)');
+%Calcolo della DFT del segnale modulato.
+spettro_modulato = fft(segnale_modulato);
+%Rappresentazione grafica dello spettro delle ampiezze.
+figure('Name','Spettro del segnale Modulato','NumberTitle','off');
+plot(f - frequenza_campionamento/2, fftshift(abs(spettro_modulato)));
+title('Parte reale dello spettro');
 grid on;
 xlabel('Frequenza (Hz)');
 ylabel('Ampiezza');
 
-subplot(2,1,2);
-plot(f-frequenza_campionamento/2,fftshift(abs(spettro_secondo_segnale_modulato)));
-grid on;
-title('Spettro del secondo segnale modulato(4KHz)');
-xlabel('Frequenza (Hz)');
-ylabel('Ampiezza');
+%% Aggiunta della parte necessaria alla correlazione in ricezione.
+%In questa parte dello script ci ci occupa di inserire nel segnale una
+%sequenza di Barker nota anche al ricevitore. In questo modo è possibile
+%sincronizzare il ricevitore in ricezione, in modo che possa demodulare
+%solo la parte di segnale "Utile".
 
-figure('Name','Spettro dei segnali sovrapposti','NumberTitle','off');
-plot(f - frequenza_campionamento/2, fftshift(abs(spettro_sovrapposizione_modulata)));
-title('Spettro del segnale costituito dalla sovrapposizione dei due segnali modulati');
-grid on;
-xlabel('Frequenza (Hz)');
-ylabel('Ampiezza');
-%--------------------------------------------------------------------------
-%% Sezione di esportazione
-%Al fine di evitare le problematiche dovute all'acquisizione dell'audio
-%tramite microfono, si è pensato di esportare il segnale modulato
-%all'interno di un file...
-audiowrite('modulato.wav',sovrapposizione_modulata,frequenza_campionamento);
+H = comm.BarkerCode('SamplesPerFrame',100000);
 
+sequenza_nota = H();
 
+%Concateno il segnale con la sequenza nota, in modo tale che il ricevitore
+%possa capire da dove inizia la parte di segnale modulato.
+segnale_trasmesso = [sequenza_nota;segnale_modulato];
 
-
+%Esportazione del segnale modulato con la relativa sequenza di
+%sincronizzazione su un file ".wav". In questo modo è possibile riprodurre
+%il file mediante un dispositivo per simulare la trasmissione radio.
+audiowrite('modulato.wav',segnale_trasmesso,frequenza_campionamento);
 
 
 
