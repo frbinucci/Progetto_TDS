@@ -1,11 +1,21 @@
 %% Area di inizializzazione
 clearvars;
 close all;
-
+%% Area di presentazione.
+%In questa sezione vengono mostrate le istruzioni utili per il
+%funzionamento dello script.
+disp("***Istruzioni per l'utilizzo dello script***");
+disp("Per il corretto funzionamento dello script di consiglia di: ");
+disp("1)Registrare il messaggio vocale che si intende trasmettere");
+disp("2)Prelevare il file .wav, presente nella cartella di esecuzione dello script");
+disp("3)Riprodurre il file mediante un dispositivo (es. smartphone) all'atto di ricezione");
+disp("Nota: l'acquisizione del segnale dura 10 secondi.");
+disp("Premere invio per procedere con la registrazione...");
+pause();
 %% Acquisizione del segnale da trasmettere.
 
 %Il segnale in ricezione viene acquisito tramite microfono.
-%Definizione del tempo di registrazione (20 secondi).
+%Definizione del tempo di registrazione (10 secondi).
 tempo_acquisizione = 10;
 %Definizione della frequenza di campionamento necessaria.
 frequenza_campionamento = 50000;

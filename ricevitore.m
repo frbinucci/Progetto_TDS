@@ -3,6 +3,11 @@
 clearvars;
 close all;
 
+%% Area di presentazione.
+%In questa sezione vengono mostrate le istruzioni utili per il
+%funzionamento dello script.
+disp("Premere invic per procedere con l'acquisizione del segnale... (l'acquisizione del segnale dura 15 secondi).");
+pause();
 %% Definizione del filtro necessario al filtraggio del segnale demodulato. 
 % Il segnale demodulato viene nuovamente filtrato passa-basso, in modo da
 % eliminarne tutte le componenti frequenziali superiori ai 4KHz. Viene
@@ -100,29 +105,37 @@ segnale_ricevuto = ssbdemod(segnale_utile,frequenza_modulazione,frequenza_campio
 %Filtraggio del segnale, mediante la risposta impulsiva precedentemente
 %definita.
 
-segnale_ricevuto = filter(risposta_impulsiva,1,segnale_ricevuto);
+segnale_filtrato = filter(risposta_impulsiva,1,segnale_ricevuto);
 
 %Analisi spettrale del segnale ricevuto.
 %Vengono rappresentati solo gli spettri di ampiezza.
 %--------------------------------------------------------------------------
 spettro_ricevuto = fft(segnale_ricevuto);
+spettro_filtrato = fft(segnale_filtrato);
+
 spettro_utile = fft(segnale_utile);
 
-figure('Name','Spettri di ampiezza','NumberTitle','off');
-subplot(2,1,1);
+figure('Name','Spettro del segnale non demodulato','NumberTitle','off');
 plot(f - frequenza_campionamento/2, fftshift(abs(spettro_utile)));
 title("Spettro del segnale ricevuto (NON Demodulato)");
 grid on;
 xlabel("Frequenza (Hz)");
 ylabel("Ampiezza");
-subplot(2,1,2);
+
+figure('Name','Spettri del segnale demodulato','NumberTitle','off');
+subplot(2,1,1);
 plot(f - frequenza_campionamento/2, fftshift(abs(spettro_ricevuto)));
 grid on;
-title("Spettro del segnale Demodulato");
+title("Spettro del segnale Demodulato NON Filtrato");
 xlabel('Frequenza (Hz)');
 ylabel('Ampiezza');
-
+subplot(2,1,2);
+plot(f - frequenza_campionamento/2, fftshift(abs(spettro_filtrato )));
+grid on;
+title("Spettro del segnale Demodulato Filtrato");
+xlabel('Frequenza (Hz)');
+ylabel('Ampiezza');
 %--------------------------------------------------------------------------
 %Riproduco il segnale demodulato per verificare che l'informazione sia
 %stata ricevuta correttamente.
-sound(segnale_ricevuto,frequenza_campionamento);
+sound(segnale_filtrato,frequenza_campionamento);
