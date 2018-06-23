@@ -3,6 +3,21 @@
 clearvars;
 close all;
 
+%% Definizione del filtro necessario al filtraggio del segnale demodulato. 
+% Il segnale demodulato viene nuovamente filtrato passa-basso, in modo da
+% eliminarne tutte le componenti frequenziali superiori ai 4KHz. Viene
+% utilizzato il medesimo filtro impiegato nello script di Modulazione.
+
+%Definizione della frequenza di campionamento.
+frequenza_campionamento = 50000;
+
+fpass = 4000; %%Limite banda passante.
+fstop = 4500; %%Limite banda di transisione.
+Apass = 1; %%Ripple in banda passante. (dB).
+Astop = 45; %%Ripple in banda di transizione (dB).
+
+risposta_impulsiva = generaRisposta(fpass,fstop,Apass,Astop,frequenza_campionamento);
+
 %% Acqusizione del segnale e sincronizzazione del ricevitore.
 %Lo scopo di questa sezione di codice è quello di sincronizzare il
 %ricevitore, in modo da poter demodulare solo la parte di segnale "utile".
@@ -13,35 +28,14 @@ close all;
 %quello in cui la correlazione tra le due sequenze è massima, e sarà
 %l'istante a partire dal quale il segnale ricevuto sarà demodulato.
 
-%La sequenza nota viene ottenuta come sequenza di "Barker". Maggiori
-%approfondimenti sono richiesti sul tema...
-H = comm.BarkerCode('SamplesPerFrame',100000);
+%La sequenza nota viene ottenuta come sequenza di "Barker".
+H = comm.BarkerCode('SamplesPerFrame',10000);
 
 sequenza_nota = H();
 
-%Vengono mostrati l'andamento temporale e lo spettro delle ampiezze della
-%sequenza.
-spettroSync = fft(sequenza_nota);
-
-figure('Name','Spettro Sequenza','NumberTitle','off');
-subplot(2,1,1);
-plot((0:numel(sequenza_nota)-1),sequenza_nota);
-grid on;
-title('Andamento temporale della sequenza.');
-xlabel('Tempo');
-ylabel('Ampiezza');
-subplot(2,1,2);
-plot((0:numel(spettroSync)-1),fftshift(abs(spettroSync)));
-grid on;
-title('Spettro della sequenza');
-xlabel('Frequenza');
-ylabel('Ampiezza');
-
 %Il segnale in ricezione viene acquisito tramite microfono.
 %Definizione del tempo di registrazione (10 secondi).
-tempo_acquisizione = 20;
-%Definizione della frequenza di campionamento necessaria.
-frequenza_campionamento = 50000;
+tempo_acquisizione = 15;
 %Definizione dell'oggetto necessario alla registrazione dell'audio.
 rec = audiorecorder(frequenza_campionamento,16,1);
 
@@ -81,7 +75,7 @@ ritardo = ceil(ritardo);
 %Il vettore "segnale_utile" conterrà solo la parte di segnale ricevuto a
 %partire dall'istante di sincronizzazione, e sarà quello che verrà
 %demodulato.
-segnale_utile = ricevuto(round(frequenza_campionamento)*ritardo+1:end);
+segnale_utile = ricevuto(round(frequenza_campionamento)*ritardo:end);
 
 %Ottenimento del grafico della funzione di cross-correlazione.
 figure('Name','Correlazione','NumberTitle','off');
@@ -95,16 +89,40 @@ ylabel('Ampiezza');
 %sound(segnale_utile,frequenza_campionamento);
 
 
-%% Demodulazione del segnale
+%% Demodulazione del segnale e filtraggio.
 %In questa parte dello script ci si occupa di demodulare il segnale utile.
+%Definisco un vettore delle frequenze, utile per rappresentare i vari
+%grafici.
+f = (0:(length(segnale_utile) - 1))' * (frequenza_campionamento / length(segnale_utile));
 frequenza_modulazione = 8000;
 segnale_ricevuto = ssbdemod(segnale_utile,frequenza_modulazione,frequenza_campionamento);
 
-%Analisi spettrale del segnale ricevuto.
-%--------------------------------------------------------------------------
-    %Under Construction!
-%--------------------------------------------------------------------------
+%Filtraggio del segnale, mediante la risposta impulsiva precedentemente
+%definita.
 
+segnale_ricevuto = filter(risposta_impulsiva,1,segnale_ricevuto);
+
+%Analisi spettrale del segnale ricevuto.
+%Vengono rappresentati solo gli spettri di ampiezza.
+%--------------------------------------------------------------------------
+spettro_ricevuto = fft(segnale_ricevuto);
+spettro_utile = fft(segnale_utile);
+
+figure('Name','Spettri di ampiezza','NumberTitle','off');
+subplot(2,1,1);
+plot(f - frequenza_campionamento/2, fftshift(abs(spettro_utile)));
+title("Spettro del segnale ricevuto (NON Demodulato)");
+grid on;
+xlabel("Frequenza (Hz)");
+ylabel("Ampiezza");
+subplot(2,1,2);
+plot(f - frequenza_campionamento/2, fftshift(abs(spettro_ricevuto)));
+grid on;
+title("Spettro del segnale Demodulato");
+xlabel('Frequenza (Hz)');
+ylabel('Ampiezza');
+
+%--------------------------------------------------------------------------
 %Riproduco il segnale demodulato per verificare che l'informazione sia
 %stata ricevuta correttamente.
 sound(segnale_ricevuto,frequenza_campionamento);

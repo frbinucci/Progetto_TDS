@@ -6,7 +6,7 @@ close all;
 
 %Il segnale in ricezione viene acquisito tramite microfono.
 %Definizione del tempo di registrazione (20 secondi).
-tempo_acquisizione = 5;
+tempo_acquisizione = 10;
 %Definizione della frequenza di campionamento necessaria.
 frequenza_campionamento = 50000;
 %Definizione dell'oggetto necessario alla registrazione dell'audio.
@@ -33,17 +33,29 @@ fstop = 4500; %%Limite banda di transisione.
 Apass = 1; %%Ripple in banda passante. (dB).
 Astop = 45; %%Ripple in banda di transizione (dB).
 
-%Funzioni necessarie all'implementazione della risposta impulsiva
-%desiderata.
-%--------------------------------------------------------------------------
-[N, Fo, Mo, W] = firpmord([fpass fstop], ... % estremi della banda di transizione
-                            [1 0], ... % ampiezze desiderate nella banda passante e tagliante
-                            [(10^(Apass/20) - 1) 10^(-Astop/20)], ... % ripple e attenuazione IN LINEARE
-                            frequenza_campionamento); % la frequenza di campionamento
-N = 2 * ceil(N/2) + 2;
-risposta_impulsiva = firpm(N, Fo, Mo, W);
-%--------------------------------------------------------------------------
+%Visto che il filtraggio di un segnale è una problematica ricorrente, si è
+%deciso di automatizzare la generazione della risposta impulsiva del filtro
+%mediante la definizione di un'apposita funzione, caricata in uno script
+%esterno.
+risposta_impulsiva = generaRisposta(fpass,fstop,Apass,Astop,frequenza_campionamento);
 
+%Rappresento graficamente la funzione di trasferimento del filtro
+%passa-basso appena creato.
+funzione_trasferimento = fft(risposta_impulsiva,2^11);
+asse_frequenze = (0:(length(funzione_trasferimento) - 1))' * (frequenza_campionamento / length(funzione_trasferimento));
+figure('Name','Funzione di trasferimento del filtro','NumberTitle','off');
+subplot(2,1,1);
+plot(asse_frequenze - frequenza_campionamento/2, fftshift(abs(funzione_trasferimento)));
+grid on;
+xlabel('Frequenza (Hz)');
+ylabel('Ampiezza');
+subplot(2,1,2);
+plot(asse_frequenze - frequenza_campionamento/2, fftshift(phase(funzione_trasferimento)));
+grid on;
+xlabel('Frequenza (Hz)');
+ylabel('Fase (°)');
+
+%--------------------------------------------------------------------------
 %Filtro il segnale acquisito mediante la risposta impulsiva precedentemente
 %definita.
 segnale_informativo = filter(risposta_impulsiva,1, segnale_acquisito);
@@ -97,7 +109,6 @@ spettro_modulato = fft(segnale_modulato);
 %Rappresentazione grafica dello spettro delle ampiezze.
 figure('Name','Spettro del segnale Modulato','NumberTitle','off');
 plot(f - frequenza_campionamento/2, fftshift(abs(spettro_modulato)));
-title('Parte reale dello spettro');
 grid on;
 xlabel('Frequenza (Hz)');
 ylabel('Ampiezza');
@@ -108,7 +119,7 @@ ylabel('Ampiezza');
 %sincronizzare il ricevitore in ricezione, in modo che possa demodulare
 %solo la parte di segnale "Utile".
 
-H = comm.BarkerCode('SamplesPerFrame',100000);
+H = comm.BarkerCode('SamplesPerFrame',10000);
 
 sequenza_nota = H();
 
